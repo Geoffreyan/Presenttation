@@ -1,0 +1,74 @@
+library(tidyverse)
+H<-read.csv("C:/Users/Administrator/Desktop/R pre/Bank marketing data/bank-full.csv",header = T)
+#Note that, the above data have several variables including factors variable
+#that have more than one class where class 'unknown' is not sure to be
+#taken as an class.
+#Trial 1, try to classify the factor variables into different class
+#We first need to know about the basic details of data set.
+nrow(H)#Number of samples before 'unknown' samples
+#been deleted,N=45211
+ncol(H)#Number of variables including response,
+#|X|=17
+#-------------------------------------------------------------------------
+#Trial 1, classify 'Education'
+#-------------------------------------------------------------------------
+#1st method, without replacing class into numeric figures
+head(H)#samples of education is at the 4 column of data set
+#Create groups of education
+group_education<-H$education
+group_education
+#perform LDA
+#create train and test education data set, using only the input variable
+#list on the word documents(categorical to numeric figures are not done  yet)
+library(MASS)
+#Let LDA classify the classes of factor 'education'
+mod_lda <- lda(y~., data = traindata)
+#Dividing the test set
+index <- sample(2,nrow(H),replace = TRUE,prob = c(0.1,0.9))
+traindata <- H[index==1,]
+testdata <- H[index==2,]
+#set seed
+set.seed(1234)
+
+
+
+# decision tree
+library(rpart)
+library(rpart.plot)
+mod_tree <- rpart(y~., data = traindata)
+rpart.plot(mod_tree)
+# support vector machines
+mod_tree$cptable
+# detect which cp value that the error is min
+plotcp(mod_tree)
+# cut tree
+mod_tree_cp <- prune(mod_tree, cp = 0.024)
+rpart.plot(mod_tree_cp)
+
+# random forest 
+library(randomForest)
+mod_rf <- randomForest(y~., data = traindata)
+importance(mod_rf)
+importance(mod_rf) %>% data.frame() %>%
+  mutate(Var = row.names(.)) %>%
+  ggplot(aes(x = reorder(Var, MeanDecreaseGini), y = MeanDecreaseGini))+
+  geom_point() +
+  geom_segment(aes(xend = reorder(Var, MeanDecreaseGini), yend = 0)) +
+  coord_flip() +
+  labs(x = "", y = "Importance of the variables")
+plot(mod_rf)
+
+# prediction
+
+pred_lda <- predict(mod_lda, traindata)
+pred_lda$posterior
+pred_lda_l <- c("no", "yes")[apply(pred_lda$posterior, 1, which.max)]
+pred_rf <- predict(mod_rf, H)
+pred_tree <- predict(mod_tree_cp, H)
+pred_tree_l <- c("no", "yes")[apply(pred_tree, 1, which.max)]
+
+library(caret)
+confusionMatrix(factor(pred_lda_l), factor(traindata$y))
+confusionMatrix(factor(pred_rf), factor(H$y))
+confusionMatrix(factor(pred_tree_l), factor(H$y))
+
